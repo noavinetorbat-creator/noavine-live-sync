@@ -569,13 +569,30 @@ async function handle(request, env) {
         className: attr(a, "class").slice(0, 160)
       }));
       const classes = [...new Set([...document.querySelectorAll("[class]")].map(x => attr(x, "class")).filter(Boolean))].slice(0, 100);
+      const mediaSamples = [...document.querySelectorAll(
+        ".etme_widget_message_video_player, .etme_widget_message_video_thumb, .etme_widget_message_video_wrap, .etme_widget_message_photo_wrap"
+      )].slice(0, 12).map(el => ({
+        className: attr(el, "class"),
+        tag: el.tagName?.toLowerCase() || "",
+        href: attr(el, "href"),
+        src: attr(el, "src"),
+        style: attr(el, "style"),
+        html: (el.outerHTML || "").slice(0, 1800)
+      }));
+      const messageSamples = [...document.querySelectorAll(".etme_widget_message_wrap")].slice(0, 15).map(el => ({
+        id: (el.querySelector('a[href*="/noavinetorbat/"], a[href*="/s/noavinetorbat/"]')?.getAttribute("href") || "").match(/(\\d+)\\/?$/)?.[1] || "",
+        text: textOf(el.querySelector(".etme_widget_message_text")).slice(0, 240),
+        date: textOf(el.querySelector(".etme_widget_message_date"))
+      }));
       return json({
         ok: true,
         htmlLength: html.length,
         pageTitle: document.title,
         anchorCount: document.querySelectorAll("a[href]").length,
         anchors,
-        classes
+        classes,
+        mediaSamples,
+        messageSamples
       });
     } catch (e) {
       return json({ ok: false, error: String(e.message || e) }, 502);
