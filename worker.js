@@ -94,7 +94,9 @@ function getMedia(node) {
 
     let cls = "";
     let parent = el;
-    for (let i = 0; i < 4 && parent; i++, parent = parent.parentElement) {
+    // در markup ایتا لینک فایل گاهی چند لایه پایین‌تر از video_player است.
+    // تا رسیدن به خود پیام، کلاس والدها را بررسی می‌کنیم.
+    for (let i = 0; i < 12 && parent; i++, parent = parent.parentElement) {
       cls += " " + attr(parent, "class");
     }
     cls = cls.toLowerCase();
@@ -103,7 +105,8 @@ function getMedia(node) {
     const tag = el.tagName?.toLowerCase();
     const isVideo = tag === "video" ||
       /\.(mp4|webm|mov)(?:[?#]|$)/i.test(url) ||
-      /video_player|message_video|video_wrap/.test(cls);
+      /video_player|message_video|video_wrap|video_thumb/.test(cls) ||
+      /\/download_[^/?#]+/.test(url) && /video|media_player/.test(cls);
     const isAudio = tag === "audio" || /\.(mp3|m4a|ogg|wav)(?:[?#]|$)/i.test(url);
     const isImage = tag === "img" ||
       /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(url) ||
