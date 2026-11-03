@@ -614,29 +614,4 @@ export default {
       })
     );
   }
-};  }
-  if (url.pathname==="/api/sync" && request.method==="POST") {
-    if(!authorized(request,env)) return json({ok:false,error:"unauthorized"},401);
-    try { return json(await sync(env)); }
-    catch(e){ return json({ok:false,error:String(e.message||e)},502); }
-  }
-  if (url.pathname==="/api/debug" && request.method==="GET") {
-    if(!authorized(request,env)) return json({ok:false,error:"unauthorized"},401);
-    try {
-      const html=await fetchChannel();
-      const {document}=parseHTML(html);
-      const sample=[...document.querySelectorAll("[class]")].map(x=>attr(x,"class")).filter(x=>/message|post|media/i.test(x)).slice(0,60);
-      return json({ok:true,htmlLength:html.length,title:document.title,matchingClasses:[...new Set(sample)]});
-    } catch(e){return json({ok:false,error:String(e.message||e)},502);}
-  }
-  return json({ok:false,error:"not_found"},404);
-}
-export default {
-  async fetch(request,env) { return handle(request,env); },
-  async scheduled(controller,env,ctx) {
-    ctx.waitUntil(sync(env).catch(async e=>{
-      await env.DB.prepare("INSERT INTO sync_log(status,detail,created_at) VALUES('error',?,?)")
-        .bind(String(e.message||e).slice(0,500),new Date().toISOString()).run();
-    }));
-  }
 };
