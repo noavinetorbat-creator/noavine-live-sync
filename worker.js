@@ -558,6 +558,54 @@ async function handle(request, env) {
     }
   }
 
+  if (url.pathname === "/api/inspect" && request.method === "GET") {
+    try {
+      const html = await fetchChannel();
+      const { document } = parseHTML(html);
+      const rows = [];
+      const seen = new Set();
+
+      for (const a of document.querySelectorAll("a[href]")) {
+        const href = absoluteUrl(attr(a, "href"));
+        let match;
+        try {
+          match = new URL(href).pathname.match(
+            new RegExp("(?:/s/)?" + CHANNEL + "/(\\\\d+)")
+          );
+        } catch {}
+
+        if (!match || seen.has(match[1])) continue;
+        seen.add(match[1]);
+
+        let node = a;
+        const levels = [];
+        for (let i = 0; i < 7 && node; i++, node = node.parentElement) {
+          const cls = attr(node, "class");
+          const txt = textOf(node);
+          levels.push({
+            tag: node.tagName?.toLowerCase() || "",
+            className: cls.slice(0, 180),
+            textLength: txt.length,
+            textSample: txt.slice(0, 220),
+            images: node.querySelectorAll?.("img").length || 0,
+            videos: node.querySelectorAll?.("video").length || 0
+          });
+        }
+        rows.push({ id: match[1], levels });
+        if (rows.length >= 5) break;
+      }
+
+      return json({
+        ok: true,
+        htmlLength: html.length,
+        pageTitle: document.title,
+        postSamples: rows
+      });
+    } catch (e) {
+      return json({ ok: false, error: String(e.message || e) }, 502);
+    }
+  }
+
   if (url.pathname === "/api/debug" && request.method === "GET") {
     if (!authorized(request, env)) {
       return json({
