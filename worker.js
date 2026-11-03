@@ -80,44 +80,61 @@ function getMedia(node) {
   const found = new Map();
   if (!node?.querySelectorAll) return [];
 
-  for (const el of node.querySelectorAll("img[src], video[src], video source[src], audio[src], a[href]")) {
-    const raw = attr(el, "src") || attr(el, "href");
-    const url = absoluteUrl(raw);
-    if (!url || !/^https?:/.test(url)) continue;
+  // فقط ظرف‌های اختصاصی رسانه را بررسی می‌کنیم؛ لینک‌های معمولی متن پست
+  // نباید به‌اشتباه به‌عنوان فایل رسانه ذخیره شوند.
+  const containers = [
+    ...node.querySelectorAll(
+      ".etme_widget_message_video_player, .etme_widget_message_video_thumb, .etme_widget_message_video_wrap, .etme_widget_message_photo_wrap, .etme_widget_message_photo, .etme_widget_message_audio"
+    )
+  ];
 
-    try {
-      const parsed = new URL(url);
-      if (parsed.hostname.endsWith("eitaa.com") &&
-          (/^\/s\/noavinetorbat\/\d+$/.test(parsed.pathname) ||
-           /^\/noavinetorbat\/\d+$/.test(parsed.pathname))) continue;
-    } catch {}
+  for (const box of containers) {
+    const boxClass = attr(box, "class").toLowerCase();
+    const videoBox = /video_player|message_video|video_wrap|video_thumb/.test(boxClass);
+    const imageBox = /photo_wrap|message_photo/.test(boxClass);
+    const audioBox = /message_audio/.test(boxClass);
+    const elements = [box, ...box.querySelectorAll(
+      "a[href], img[src], img[data-src], video[src], video source[src], audio[src], source[src]"
+    )];
 
-    let cls = "";
-    let parent = el;
-    // در markup ایتا لینک فایل گاهی چند لایه پایین‌تر از video_player است.
-    // تا رسیدن به خود پیام، کلاس والدها را بررسی می‌کنیم.
-    for (let i = 0; i < 12 && parent; i++, parent = parent.parentElement) {
-      cls += " " + attr(parent, "class");
+    for (const el of elements) {
+      const tag = el.tagName?.toLowerCase() || "";
+      const rawValues = [
+        attr(el, "src"), attr(el, "data-src"), attr(el, "href"),
+        attr(el, "data-original"), attr(el, "data-url")
+      ].filter(Boolean);
+
+      const style = attr(el, "style");
+      const bg = style.match(/background-image\s*:\s*url\(['"]?([^)'"]+)/i)?.[1];
+      if (bg) rawValues.push(bg);
+
+      for (const raw of rawValues) {
+        const url = absoluteUrl(raw);
+        if (!url || !/^https?:/.test(url)) continue;
+        try {
+          const parsed = new URL(url);
+          if (parsed.hostname.endsWith("eitaa.com") &&
+              (/^\/s\/noavinetorbat\/\d+$/.test(parsed.pathname) ||
+               /^\/noavinetorbat\/\d+$/.test(parsed.pathname))) continue;
+        } catch {}
+
+        const isVideo = videoBox || tag === "video" || tag === "source" && videoBox ||
+          /\.(mp4|webm|mov|m3u8)(?:[?#]|$)/i.test(url);
+        const isAudio = audioBox || tag === "audio" ||
+          /\.(mp3|m4a|ogg|wav)(?:[?#]|$)/i.test(url);
+        const isImage = imageBox || tag === "img" ||
+          /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(url);
+
+        if (!isVideo && !isAudio && !isImage) continue;
+        const type = isVideo ? "video" : isAudio ? "audio" : "image";
+        const previous = found.get(url);
+        if (!previous || type === "video") found.set(url, { url, type });
+      }
     }
-    cls = cls.toLowerCase();
-    if (/avatar|profile|userpic|logo/.test(cls)) continue;
-
-    const tag = el.tagName?.toLowerCase();
-    const isVideo = tag === "video" ||
-      /\.(mp4|webm|mov)(?:[?#]|$)/i.test(url) ||
-      /video_player|message_video|video_wrap|video_thumb/.test(cls) ||
-      /\/download_[^/?#]+/.test(url) && /video|media_player/.test(cls);
-    const isAudio = tag === "audio" || /\.(mp3|m4a|ogg|wav)(?:[?#]|$)/i.test(url);
-    const isImage = tag === "img" ||
-      /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(url) ||
-      /photo_wrap|message_photo/.test(cls);
-
-    if (!isVideo && !isAudio && !isImage) continue;
-    found.set(url, { url, type: isVideo ? "video" : isAudio ? "audio" : "image" });
   }
+
   return [...found.values()].slice(0, 12);
 }
-
 function isOnlyTime(text) {
   return /^\d{1,2}:\d{2}$/.test(clean(text));
 }
@@ -365,6 +382,17 @@ async function sync(env) {
     };
   }
 
+  // پاک‌سازی رکوردهای خراب قدیمی که متنشان فقط ساعت یا «سنجاق پیغام» است.
+  const existingRows = await env.DB.prepare("SELECT id, body FROM posts").all();
+  let removed = 0;
+  for (const row of (existingRows.results || [])) {
+    const body = clean(row.body || "");
+    if (isOnlyTime(body) || body === "سنجاق پیغام") {
+      await env.DB.prepare("DELETE FROM posts WHERE id=?").bind(row.id).run();
+      removed++;
+    }
+  }
+
   let inserted = 0;
   let updated = 0;
 
@@ -438,7 +466,7 @@ async function sync(env) {
   await env.DB.prepare(
     "INSERT INTO sync_log(status, detail, created_at) VALUES('ok', ?, ?)"
   ).bind(
-    `found=${posts.length}; inserted=${inserted}; updated=${updated}`,
+    `found=${posts.length}; inserted=${inserted}; updated=${updated}; removed=${removed}`,
     new Date().toISOString()
   ).run();
 
@@ -446,7 +474,8 @@ async function sync(env) {
     ok: true,
     found: posts.length,
     inserted,
-    updated
+    updated,
+    removed
   };
 }
 
