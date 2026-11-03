@@ -1,0 +1,11 @@
+name = "noavine-live-sync"
+main = "worker.js"
+compatibility_date = "2026-10-31"
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "noavine-live-db"
+database_id = "350a04da-3eb2-4988-a7d2-a108ad3805a4"
