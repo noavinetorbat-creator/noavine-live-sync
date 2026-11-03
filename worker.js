@@ -228,7 +228,7 @@ function extractPosts(html) {
 
     const body = extractBestText(node)
       .replace(/مشاهده در ایتا/g, "")
-      .replace(/^🎬\\s*نو\+آوینه تربت‌حیدریه 📺\\s*/u, "")
+      .replace(/^🎬\s*نو\+آوینه تربت‌حیدریه 📺\s*/u, "")
       .trim();
 
     const media = getMedia(node);
