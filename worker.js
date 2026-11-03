@@ -78,42 +78,40 @@ function hashtags(text) {
 
 function getMedia(node) {
   const found = new Map();
-
   if (!node?.querySelectorAll) return [];
 
-  for (const el of node.querySelectorAll(
-    "img[src], video[src], video source[src], audio[src], a[href]"
-  )) {
+  for (const el of node.querySelectorAll("img[src], video[src], video source[src], audio[src], a[href]")) {
     const raw = attr(el, "src") || attr(el, "href");
     const url = absoluteUrl(raw);
-
     if (!url || !/^https?:/.test(url)) continue;
 
-    const cls = (
-      attr(el, "class") + " " +
-      attr(el.parentElement, "class")
-    ).toLowerCase();
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname.endsWith("eitaa.com") &&
+          (/^\/s\/noavinetorbat\/\d+$/.test(parsed.pathname) ||
+           /^\/noavinetorbat\/\d+$/.test(parsed.pathname))) continue;
+    } catch {}
 
-    const looksMedia =
-      /media|photo|video|document|file|attachment/.test(cls) ||
-      /\.(jpg|jpeg|png|webp|gif|mp4|webm|mp3|m4a|ogg)(?:[?#]|$)/i.test(url);
-
-    if (el.tagName?.toLowerCase() === "img" || looksMedia) {
-      if (/avatar|profile|userpic|logo/i.test(cls)) continue;
-
-      const tag = el.tagName?.toLowerCase();
-
-      const type =
-        /\.(mp4|webm)(?:[?#]|$)/i.test(url) || tag === "video"
-          ? "video"
-          : /\.(mp3|m4a|ogg)(?:[?#]|$)/i.test(url) || tag === "audio"
-          ? "audio"
-          : "image";
-
-      found.set(url, { url, type });
+    let cls = "";
+    let parent = el;
+    for (let i = 0; i < 4 && parent; i++, parent = parent.parentElement) {
+      cls += " " + attr(parent, "class");
     }
-  }
+    cls = cls.toLowerCase();
+    if (/avatar|profile|userpic|logo/.test(cls)) continue;
 
+    const tag = el.tagName?.toLowerCase();
+    const isVideo = tag === "video" ||
+      /\.(mp4|webm|mov)(?:[?#]|$)/i.test(url) ||
+      /video_player|message_video|video_wrap/.test(cls);
+    const isAudio = tag === "audio" || /\.(mp3|m4a|ogg|wav)(?:[?#]|$)/i.test(url);
+    const isImage = tag === "img" ||
+      /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(url) ||
+      /photo_wrap|message_photo/.test(cls);
+
+    if (!isVideo && !isAudio && !isImage) continue;
+    found.set(url, { url, type: isVideo ? "video" : isAudio ? "audio" : "image" });
+  }
   return [...found.values()].slice(0, 12);
 }
 
@@ -230,6 +228,7 @@ function extractPosts(html) {
 
     const body = extractBestText(node)
       .replace(/مشاهده در ایتا/g, "")
+      .replace(/^🎬\\s*نو\+آوینه تربت‌حیدریه 📺\\s*/u, "")
       .trim();
 
     const media = getMedia(node);
@@ -240,14 +239,16 @@ function extractPosts(html) {
       body.split(/\n/).map(clean).find(Boolean) ||
       (media[0]?.type === "video" ? "ویدئو" : "محتوای رسانه‌ای");
 
-    const dateEl = node.querySelector(
-      "time[datetime], time, [class*='date']"
-    );
-
+    // فقط نشانگر تاریخ پست؛ مدت ویدئو نباید به‌عنوان ساعت ذخیره شود.
+    const dateEl =
+      node.querySelector(".etme_widget_message_date[datetime]") ||
+      node.querySelector(".etme_widget_message_date") ||
+      node.querySelector("time[datetime]") ||
+      node.querySelector("time");
+    const dateText = textOf(dateEl);
     const publishedAt =
       attr(dateEl, "datetime") ||
-      textOf(dateEl) ||
-      "";
+      (/^\d{1,2}:\d{2}$/.test(dateText) ? dateText : "");
 
     const sourceUrl =
       permalink || `${CHANNEL_URL}/${id}`;
