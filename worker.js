@@ -253,15 +253,14 @@ function extractPosts(html) {
       .replace(/^\s*\d+(?:\.\d+)?\s*(?:KB|MB|GB|M|K)\s*حجم رسانه بالاست\s*(?:\r?\n)*/imu, "")
       .trim();
 
-    if (!body || isOnlyTime(body) || body === "سنجاق پیغام") return;
-
     const media = getMedia(node);
 
-    if (!body && !media.length) return;
+    // پیام رسانه‌ای ممکن است کپشن نداشته باشد؛ فقط وقتی هر دو خالی‌اند حذفش کن.
+    if ((!body || isOnlyTime(body) || body === "سنجاق پیغام") && !media.length) return;
 
     const title =
-      body.split(/\n/).map(clean).find(Boolean) ||
-      (media[0]?.type === "video" ? "ویدئو" : "محتوای رسانه‌ای");
+      body.split(/\\n/).map(clean).find(Boolean) ||
+      (media[0]?.type === "video" ? "ویدئو" : media[0]?.type === "audio" ? "صوت" : "محتوای رسانه‌ای");
 
     // فقط نشانگر تاریخ پست؛ مدت ویدئو نباید به‌عنوان ساعت ذخیره شود.
     const dateEl =
