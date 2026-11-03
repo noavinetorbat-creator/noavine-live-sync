@@ -259,7 +259,7 @@ function extractPosts(html) {
     if ((!body || isOnlyTime(body) || body === "سنجاق پیغام") && !media.length) return;
 
     const title =
-      body.split(/\\n/).map(clean).find(Boolean) ||
+      body.split(/\n/).map(clean).find(Boolean) ||
       (media[0]?.type === "video" ? "ویدئو" : media[0]?.type === "audio" ? "صوت" : "محتوای رسانه‌ای");
 
     // فقط نشانگر تاریخ پست؛ مدت ویدئو نباید به‌عنوان ساعت ذخیره شود.
