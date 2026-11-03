@@ -232,7 +232,11 @@ function extractPosts(html) {
     const body = extractBestText(node)
       .replace(/مشاهده در ایتا/g, "")
       .replace(/^🎬\s*نو\+آوینه تربت‌حیدریه 📺\s*/u, "")
+      .replace(/^\s*\d{1,2}:\d{2}\s*(?:\r?\n)+/u, "")
+      .replace(/^\s*\d+(?:\.\d+)?\s*(?:KB|MB|GB|M|K)\s*حجم رسانه بالاست\s*(?:\r?\n)*/imu, "")
       .trim();
+
+    if (!body || isOnlyTime(body) || body === "سنجاق پیغام") return;
 
     const media = getMedia(node);
 
