@@ -402,8 +402,13 @@ async function sync(env) {
 
     const fingerprint = await sha256(
       JSON.stringify({
+        title: p.title,
         text: p.text,
-        media: p.media
+        publishedAt: p.publishedAt,
+        category: p.category,
+        hashtags: p.hashtags,
+        media: p.media,
+        sourceUrl: p.sourceUrl
       })
     );
 
